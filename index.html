@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IoT EM Field Monitor — RV College of Engineering</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #020b18;
+    --panel: #061428;
+    --panel2: #071a35;
+    --border: rgba(0,200,255,0.18);
+    --accent: #00d4ff;
+    --accent2: #00ff9d;
+    --accent3: #ff4d6d;
+    --warn: #ffb800;
+    --text: #cde8f5;
+    --dim: #3a6680;
+    --glow: 0 0 18px rgba(0,212,255,0.4);
+    --glow2: 0 0 18px rgba(0,255,157,0.35);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Rajdhani',sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  /* Animated grid background */
+  body::before{
+    content:'';
+    position:fixed;inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(0,212,255,0.04) 1px,transparent 1px);
+    background-size:44px 44px;
+    animation:gridMove 20s linear infinite;
+    pointer-events:none;
+    z-index:0;
+  }
+  @keyframes gridMove{from{background-position:0 0;}to{background-position:44px 44px;}}
+
+  /* Scan line overlay */
+  body::after{
+    content:'';
+    position:fixed;inset:0;
+    background:repeating-linear-gradient(
+      0deg,transparent,transparent 2px,
+      rgba(0,0,0,0.08) 2px,rgba(0,0,0,0.08) 4px
+    );
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .shell{position:relative;z-index:1;max-width:1600px;margin:0 auto;padding:12px 18px;}
+
+  /* ===== HEADER ===== */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 22px;
+    border:1px solid var(--border);
+    background:rgba(6,20,40,0.85);
+    backdrop-filter:blur(12px);
+    border-radius:10px;
+    margin-bottom:16px;
+    position:relative;
+    overflow:hidden;
+  }
+  header::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);
+    animation:scanH 3s linear infinite;
+  }
+  @keyframes scanH{from{background-position:-200% center;}to{background-position:200% center;}}
+
+  .logo-area{display:flex;align-items:center;gap:14px;}
+  .logo-dot{
+    width:42px;height:42px;border-radius:50%;
+    background:radial-gradient(circle,var(--accent) 0%,#003a55 60%,transparent 100%);
+    border:2px solid var(--accent);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Orbitron',monospace;font-weight:900;font-size:14px;color:#fff;
+    box-shadow:var(--glow);
+    animation:pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{box-shadow:var(--glow);}50%{box-shadow:0 0 30px rgba(0,212,255,0.7);}}
+  .title-block h1{font-family:'Orbitron',monospace;font-size:17px;font-weight:800;color:#fff;letter-spacing:2px;text-shadow:var(--glow);}
+  .title-block p{font-size:12px;color:var(--dim);letter-spacing:1px;font-family:'Share Tech Mono',monospace;}
+
+  .header-status{display:flex;align-items:center;gap:18px;}
+  .live-badge{
+    display:flex;align-items:center;gap:7px;
+    background:rgba(0,255,157,0.1);border:1px solid var(--accent2);
+    padding:5px 14px;border-radius:20px;
+    font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent2);
+    letter-spacing:1px;
+  }
+  .live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);animation:blink .9s ease infinite;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:0.2;}}
+  .clock{font-family:'Share Tech Mono',monospace;font-size:14px;color:var(--accent);letter-spacing:2px;}
+
+  /* ===== STATUS BAR ===== */
+  .status-bar{
+    display:grid;grid-template-columns:repeat(5,1fr);gap:12px;
+    margin-bottom:16px;
+  }
+  .stat-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:14px 18px;
+    position:relative;overflow:hidden;
+    transition:border-color .3s;
+  }
+  .stat-card:hover{border-color:var(--accent);}
+  .stat-card::before{
+    content:'';position:absolute;top:0;left:0;width:3px;height:100%;
+    background:var(--accent);
+  }
+  .stat-card.warn::before{background:var(--warn);}
+  .stat-card.danger::before{background:var(--accent3);}
+  .stat-card.ok::before{background:var(--accent2);}
+  .stat-label{font-size:11px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-family:'Share Tech Mono',monospace;}
+  .stat-value{font-family:'Orbitron',monospace;font-size:22px;font-weight:700;color:#fff;margin:4px 0;}
+  .stat-unit{font-size:11px;color:var(--accent);font-family:'Share Tech Mono',monospace;}
+  .stat-delta{font-size:11px;margin-top:2px;}
+  .delta-up{color:var(--accent3);}
+  .delta-dn{color:var(--accent2);}
+
+  /* ===== MAIN GRID ===== */
+  .main-grid{display:grid;grid-template-columns:1.1fr 1fr 0.85fr;gap:14px;margin-bottom:14px;}
+
+  /* ===== PANEL ===== */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px;
+    position:relative;overflow:hidden;
+  }
+  .panel-title{
+    font-family:'Orbitron',monospace;font-size:12px;font-weight:600;
+    color:var(--accent);letter-spacing:2px;text-transform:uppercase;
+    margin-bottom:14px;display:flex;align-items:center;gap:8px;
+  }
+  .panel-title::after{
+    content:'';flex:1;height:1px;
+    background:linear-gradient(90deg,var(--accent),transparent);
+  }
+  .panel-icon{font-size:14px;}
+
+  /* ===== RADAR ===== */
+  .radar-wrap{display:flex;align-items:center;justify-content:center;}
+  #radarCanvas{display:block;}
+
+  /* ===== WAVEFORM ===== */
+  #waveCanvas{width:100%;display:block;}
+
+  /* ===== FREQ BARS ===== */
+  .freq-grid{
+    display:grid;grid-template-columns:repeat(7,1fr);gap:6px;
+    height:160px;align-items:flex-end;
+  }
+  .freq-col{display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .freq-bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end;}
+  .freq-bar{
+    width:100%;border-radius:4px 4px 0 0;
+    transition:height .4s cubic-bezier(.34,1.56,.64,1);
+    position:relative;
+  }
+  .freq-label{font-size:9px;color:var(--dim);font-family:'Share Tech Mono',monospace;text-align:center;}
+  .freq-val{font-size:9px;color:var(--accent);font-family:'Share Tech Mono',monospace;}
+
+  /* ===== BOTTOM ROW ===== */
+  .bottom-row{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:14px;}
+
+  /* ===== SIGNAL STRENGTH GAUGE ===== */
+  #gaugeCanvas{display:block;margin:0 auto;}
+
+  /* ===== LOG TABLE ===== */
+  .log-table{width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:11px;}
+  .log-table th{color:var(--dim);text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);font-size:10px;letter-spacing:1px;}
+  .log-table td{padding:5px 8px;border-bottom:1px solid rgba(0,212,255,0.05);}
+  .log-row{animation:fadeIn .4s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+  .tag{padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:1px;}
+  .tag-ok{background:rgba(0,255,157,0.15);color:var(--accent2);}
+  .tag-warn{background:rgba(255,184,0,0.15);color:var(--warn);}
+  .tag-high{background:rgba(255,77,109,0.15);color:var(--accent3);}
+
+  /* ===== DIRECTION COMPASS ===== */
+  #compassCanvas{display:block;margin:0 auto;}
+
+  /* ===== FIELD REGION PLOT ===== */
+  #fieldCanvas{display:block;width:100%;}
+
+  /* ===== GLITCH ANIM ===== */
+  @keyframes glitch{
+    0%,100%{text-shadow:var(--glow);}
+    20%{text-shadow:3px 0 var(--accent3),-3px 0 var(--accent2);}
+    40%{text-shadow:-2px 0 var(--accent),2px 0 var(--accent3);}
+  }
+  .glitch-text{animation:glitch 5s infinite;}
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:var(--accent);border-radius:2px;}
+
+  .corner{
+    position:absolute;width:10px;height:10px;border-color:var(--accent);border-style:solid;
+  }
+  .corner.tl{top:8px;left:8px;border-width:2px 0 0 2px;}
+  .corner.tr{top:8px;right:8px;border-width:2px 2px 0 0;}
+  .corner.bl{bottom:8px;left:8px;border-width:0 0 2px 2px;}
+  .corner.br{bottom:8px;right:8px;border-width:0 2px 2px 0;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-area">
+      <div class="logo-dot">RV</div>
+      <div class="title-block">
+        <h1 class="glitch-text">IoT EM FIELD & RADIATION MONITOR</h1>
+        <p>REAL-TIME WIDEBAND SURVEILLANCE SYSTEM · LPDA DUAL-ARRAY · 800 MHz – 6 GHz</p>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="live-badge"><span class="live-dot"></span>LIVE</div>
+      <div class="clock" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- STATUS BAR -->
+  <div class="status-bar">
+    <div class="stat-card ok">
+      <div class="stat-label">Field Strength</div>
+      <div class="stat-value" id="sv-field">2.34</div>
+      <div class="stat-unit">V/m</div>
+      <div class="stat-delta delta-up" id="sd-field">▲ 0.12</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Power Density</div>
+      <div class="stat-value" id="sv-power">14.6</div>
+      <div class="stat-unit">mW/m²</div>
+      <div class="stat-delta delta-dn" id="sd-power">▼ 0.8</div>
+    </div>
+    <div class="stat-card warn">
+      <div class="stat-label">Peak Direction</div>
+      <div class="stat-value" id="sv-dir">247°</div>
+      <div class="stat-unit">Azimuth</div>
+      <div class="stat-delta" style="color:var(--warn)">◈ SW QUADRANT</div>
+    </div>
+    <div class="stat-card ok">
+      <div class="stat-label">VSWR</div>
+      <div class="stat-value" id="sv-vswr">1.82</div>
+      <div class="stat-unit">ratio</div>
+      <div class="stat-delta delta-dn">▼ 0.04</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Antenna Gain</div>
+      <div class="stat-value">7.4</div>
+      <div class="stat-unit">dBi</div>
+      <div class="stat-delta" style="color:var(--dim)">● STABLE</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- RADIATION PATTERN (POLAR) -->
+    <div class="panel">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="panel-title"><span class="panel-icon">◉</span>Radiation Pattern — Polar</div>
+      <div class="radar-wrap">
+        <canvas id="radarCanvas" width="310" height="310"></canvas>
+      </div>
+    </div>
+
+    <!-- WAVEFORM / TIME DOMAIN -->
+    <div class="panel" style="display:flex;flex-direction:column;">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="panel-title"><span class="panel-icon">〜</span>Signal Waveform — Time Domain</div>
+      <canvas id="waveCanvas" height="130"></canvas>
+      <div style="margin-top:12px;">
+        <div class="panel-title" style="margin-top:4px;"><span class="panel-icon">▦</span>Frequency Spectrum</div>
+        <div class="freq-grid" id="freqGrid"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);">
+          <span>800 MHz</span><span>2.4 GHz</span><span>6 GHz</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPASS / DIRECTION -->
+    <div class="panel">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="panel-title"><span class="panel-icon">⊕</span>Directional Scan</div>
+      <canvas id="compassCanvas" width="240" height="240"></canvas>
+      <div style="text-align:center;margin-top:8px;">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--dim);">Motor Angle</div>
+        <div style="font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:var(--accent);" id="motorAngle">247°</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM ROW -->
+  <div class="bottom-row">
+
+    <!-- FIELD REGION / DISTANCE PLOT -->
+    <div class="panel">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="panel-title"><span class="panel-icon">◈</span>Field Region vs Distance</div>
+      <canvas id="fieldCanvas" height="160"></canvas>
+    </div>
+
+    <!-- SIGNAL STRENGTH GAUGE -->
+    <div class="panel" style="display:flex;flex-direction:column;align-items:center;">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="panel-title" style="align-self:stretch;"><span class="panel-icon">⬡</span>EM Exposure Level</div>
+      <canvas id="gaugeCanvas" width="220" height="130"></canvas>
+      <div style="display:flex;gap:12px;margin-top:4px;font-family:'Share Tech Mono',monospace;font-size:10px;">
+        <span style="color:var(--accent2)">● SAFE</span>
+        <span style="color:var(--warn)">● CAUTION</span>
+        <span style="color:var(--accent3)">● HIGH</span>
+      </div>
+    </div>
+
+    <!-- EVENT LOG -->
+    <div class="panel" style="overflow:hidden;">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="panel-title"><span class="panel-icon">▤</span>Event Log</div>
+      <div style="max-height:180px;overflow-y:auto;">
+        <table class="log-table">
+          <thead><tr>
+            <th>TIME</th><th>EVENT</th><th>FREQ</th><th>STATUS</th>
+          </tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== CLOCK =====
+function updateClock(){
+  const now=new Date();
+  document.getElementById('clock').textContent=now.toTimeString().slice(0,8);
+}
+setInterval(updateClock,1000);updateClock();
+
+// ===== SHARED UTILS =====
+const R=(mn,mx)=>Math.random()*(mx-mn)+mn;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const TWO_PI=Math.PI*2;
+
+// ===== FREQ BARS SETUP =====
+const freqBands=[
+  {label:'CDMA',freq:'880M',color:'#00d4ff'},
+  {label:'GSM9',freq:'940M',color:'#00bbee'},
+  {label:'GSM18',freq:'1.8G',color:'#00ff9d'},
+  {label:'3G',freq:'2.1G',color:'#7cffcb'},
+  {label:'4G',freq:'2.35G',color:'#ffb800'},
+  {label:'WiFi',freq:'2.4G',color:'#ff6b35'},
+  {label:'5GHz',freq:'5.1G',color:'#ff4d6d'},
+];
+const freqGrid=document.getElementById('freqGrid');
+let freqBars=[];
+freqBands.forEach((b,i)=>{
+  const col=document.createElement('div');
+  col.className='freq-col';
+  col.innerHTML=`
+    <div class="freq-val" id="fv${i}">0</div>
+    <div class="freq-bar-wrap" style="height:120px;">
+      <div class="freq-bar" id="fb${i}" style="background:linear-gradient(180deg,${b.color},${b.color}44);height:20%;box-shadow:0 0 8px ${b.color}55;"></div>
+    </div>
+    <div class="freq-label">${b.label}<br>${b.freq}</div>
+  `;
+  freqGrid.appendChild(col);
+  freqBars.push({el:document.getElementById('fb'+i),val:document.getElementById('fv'+i),target:30,cur:30,color:b.color});
+});
+
+function updateFreqBars(){
+  freqBars.forEach((b,i)=>{
+    b.target=R(15,95);
+    const anim=()=>{
+      b.cur=lerp(b.cur,b.target,0.12);
+      b.el.style.height=b.cur+'%';
+      b.val.textContent=(-80+b.cur*0.3).toFixed(1)+' dBm';
+      if(Math.abs(b.cur-b.target)>0.5)requestAnimationFrame(anim);
+    };anim();
+  });
+}
+setInterval(updateFreqBars,1200);
+setTimeout(updateFreqBars,200);
+
+// ===== RADAR (RADIATION PATTERN) =====
+const radar=document.getElementById('radarCanvas');
+const rctx=radar.getContext('2d');
+const rW=radar.width,rH=radar.height,rCX=rW/2,rCY=rH/2,rR=rW/2-28;
+let radarAngle=0;
+let radarPattern=[];
+// Build a cardioid-ish radiation pattern with lobes
+function buildPattern(){
+  const pts=[];
+  for(let a=0;a<360;a++){
+    const rad=a*Math.PI/180;
+    // Main lobe + side lobes
+    const main=Math.pow(Math.abs(Math.cos(rad)),2)*0.85;
+    const back=Math.pow(Math.abs(Math.cos(rad+Math.PI)),2)*0.15;
+    const side=Math.pow(Math.abs(Math.sin(rad*2)),2)*0.1;
+    pts.push(main+back+side+R(-0.02,0.02));
+  }
+  return pts;
+}
+radarPattern=buildPattern();
+
+function drawRadar(){
+  rctx.clearRect(0,0,rW,rH);
+
+  // Circles
+  for(let r=1;r<=4;r++){
+    rctx.beginPath();
+    rctx.arc(rCX,rCY,rR*r/4,0,TWO_PI);
+    rctx.strokeStyle=`rgba(0,212,255,${0.07+r*0.04})`;
+    rctx.lineWidth=1;
+    rctx.stroke();
+    // dB labels
+    rctx.fillStyle='rgba(0,212,255,0.4)';
+    rctx.font='9px Share Tech Mono';
+    rctx.fillText(`-${(4-r)*10}dB`,rCX+4,rCY-rR*r/4+4);
+  }
+
+  // Axis lines
+  [0,45,90,135].forEach(deg=>{
+    const a=deg*Math.PI/180;
+    rctx.beginPath();
+    rctx.moveTo(rCX-Math.cos(a)*rR,rCY-Math.sin(a)*rR);
+    rctx.lineTo(rCX+Math.cos(a)*rR,rCY+Math.sin(a)*rR);
+    rctx.strokeStyle='rgba(0,212,255,0.08)';
+    rctx.lineWidth=1;
+    rctx.stroke();
+  });
+
+  // Degree labels
+  const dirs=['N','NE','E','SE','S','SW','W','NW'];
+  dirs.forEach((d,i)=>{
+    const a=i*45*Math.PI/180-Math.PI/2;
+    const x=rCX+Math.cos(a)*(rR+14);
+    const y=rCY+Math.sin(a)*(rR+14);
+    rctx.fillStyle='rgba(0,212,255,0.5)';
+    rctx.font='9px Orbitron';
+    rctx.textAlign='center';rctx.textBaseline='middle';
+    rctx.fillText(d,x,y);
+  });
+
+  // Radiation pattern fill
+  rctx.beginPath();
+  for(let a=0;a<360;a++){
+    const r=rR*radarPattern[a];
+    const angle=(a-90)*Math.PI/180;
+    const x=rCX+Math.cos(angle)*r;
+    const y=rCY+Math.sin(angle)*r;
+    a===0?rctx.moveTo(x,y):rctx.lineTo(x,y);
+  }
+  rctx.closePath();
+  const grad=rctx.createRadialGradient(rCX,rCY,0,rCX,rCY,rR);
+  grad.addColorStop(0,'rgba(0,212,255,0.25)');
+  grad.addColorStop(1,'rgba(0,212,255,0.05)');
+  rctx.fillStyle=grad;
+  rctx.fill();
+  rctx.strokeStyle='rgba(0,212,255,0.8)';
+  rctx.lineWidth=1.5;
+  rctx.stroke();
+
+  // Rotating scanner line
+  radarAngle=(radarAngle+1.5)%360;
+  const sa=( radarAngle-90)*Math.PI/180;
+
+  // Scanner sweep gradient
+  const sweepGrad=rctx.createConicalGradient?null:null;
+  // Fallback: draw a filled arc
+  rctx.save();
+  rctx.translate(rCX,rCY);
+  rctx.rotate(sa);
+  const sweep=rctx.createLinearGradient(0,0,rR,0);
+  sweep.addColorStop(0,'rgba(0,255,157,0.3)');
+  sweep.addColorStop(1,'rgba(0,255,157,0)');
+  rctx.beginPath();
+  rctx.moveTo(0,0);
+  rctx.arc(0,0,rR,-0.4,0.01);
+  rctx.fillStyle=sweep;
+  rctx.fill();
+  rctx.restore();
+
+  // Scanner line
+  rctx.beginPath();
+  rctx.moveTo(rCX,rCY);
+  rctx.lineTo(rCX+Math.cos(sa)*rR,rCY+Math.sin(sa)*rR);
+  rctx.strokeStyle='rgba(0,255,157,0.9)';
+  rctx.lineWidth=1.5;
+  rctx.shadowColor='#00ff9d';
+  rctx.shadowBlur=6;
+  rctx.stroke();
+  rctx.shadowBlur=0;
+
+  // Center dot
+  rctx.beginPath();
+  rctx.arc(rCX,rCY,4,0,TWO_PI);
+  rctx.fillStyle='#00d4ff';
+  rctx.shadowColor='#00d4ff';
+  rctx.shadowBlur=12;
+  rctx.fill();
+  rctx.shadowBlur=0;
+
+  // Occasionally update pattern
+  if(Math.random()<0.005) radarPattern=buildPattern();
+
+  requestAnimationFrame(drawRadar);
+}
+drawRadar();
+
+// ===== WAVEFORM =====
+const wave=document.getElementById('waveCanvas');
+const wctx=wave.getContext('2d');
+let waveData=[];
+let waveOffset=0;
+const WAVE_LEN=300;
+for(let i=0;i<WAVE_LEN;i++) waveData.push(0);
+
+function updateWave(){
+  const noise=R(-0.3,0.3);
+  const carrier=Math.sin(waveOffset*0.12)*0.6;
+  const mod=Math.sin(waveOffset*0.03)*0.4;
+  const pulse=Math.random()<0.02?R(-0.8,0.8):0;
+  waveData.push(carrier+mod+noise+pulse);
+  if(waveData.length>WAVE_LEN) waveData.shift();
+  waveOffset++;
+}
+
+function drawWave(){
+  updateWave();
+  const W=wave.offsetWidth||wave.parentElement.clientWidth||400;
+  wave.width=W;
+  const H=wave.height=130;
+  wctx.clearRect(0,0,W,H);
+
+  // Grid
+  for(let y=0;y<H;y+=H/4){
+    wctx.beginPath();
+    wctx.moveTo(0,y);wctx.lineTo(W,y);
+    wctx.strokeStyle='rgba(0,212,255,0.06)';
+    wctx.lineWidth=1;
+    wctx.stroke();
+  }
+
+  // Glow wave
+  const grad=wctx.createLinearGradient(0,0,W,0);
+  grad.addColorStop(0,'rgba(0,212,255,0)');
+  grad.addColorStop(0.5,'rgba(0,212,255,1)');
+  grad.addColorStop(1,'rgba(0,212,255,0.3)');
+
+  wctx.beginPath();
+  waveData.forEach((v,i)=>{
+    const x=i*(W/WAVE_LEN);
+    const y=H/2-v*(H/3);
+    i===0?wctx.moveTo(x,y):wctx.lineTo(x,y);
+  });
+  wctx.strokeStyle=grad;
+  wctx.lineWidth=1.5;
+  wctx.shadowColor='#00d4ff';
+  wctx.shadowBlur=6;
+  wctx.stroke();
+  wctx.shadowBlur=0;
+
+  // Fill under wave
+  wctx.lineTo(W,H/2);
+  wctx.lineTo(0,H/2);
+  wctx.closePath();
+  const fillG=wctx.createLinearGradient(0,H/2-40,0,H/2+20);
+  fillG.addColorStop(0,'rgba(0,212,255,0.12)');
+  fillG.addColorStop(1,'rgba(0,212,255,0)');
+  wctx.fillStyle=fillG;
+  wctx.fill();
+
+  requestAnimationFrame(drawWave);
+}
+drawWave();
+
+// ===== COMPASS =====
+const compass=document.getElementById('compassCanvas');
+const cctx=compass.getContext('2d');
+const cW=compass.width,cH=compass.height,cCX=cW/2,cCY=cH/2,cR=cW/2-20;
+let motorAngle=247;let motorTarget=247;
+
+function updateMotor(){
+  motorTarget=Math.floor(R(0,360));
+}
+setInterval(updateMotor,3500);
+
+function drawCompass(){
+  motorAngle=lerp(motorAngle,motorTarget,0.02);
+  document.getElementById('motorAngle').textContent=Math.round(motorAngle)+'°';
+
+  cctx.clearRect(0,0,cW,cH);
+
+  // Outer ring
+  cctx.beginPath();
+  cctx.arc(cCX,cCY,cR,0,TWO_PI);
+  cctx.strokeStyle='rgba(0,212,255,0.25)';
+  cctx.lineWidth=2;
+  cctx.stroke();
+
+  // Tick marks
+  for(let i=0;i<36;i++){
+    const a=i*10*Math.PI/180-Math.PI/2;
+    const big=i%9===0;
+    const r1=cR-(big?14:8);
+    const r2=cR;
+    cctx.beginPath();
+    cctx.moveTo(cCX+Math.cos(a)*r1,cCY+Math.sin(a)*r1);
+    cctx.lineTo(cCX+Math.cos(a)*r2,cCY+Math.sin(a)*r2);
+    cctx.strokeStyle=big?'rgba(0,212,255,0.7)':'rgba(0,212,255,0.25)';
+    cctx.lineWidth=big?2:1;
+    cctx.stroke();
+    if(big){
+      const lx=cCX+Math.cos(a)*(cR-22);
+      const ly=cCY+Math.sin(a)*(cR-22);
+      cctx.fillStyle='rgba(0,212,255,0.7)';
+      cctx.font='8px Orbitron';
+      cctx.textAlign='center';cctx.textBaseline='middle';
+      cctx.fillText(['N','E','S','W'][i/9],lx,ly);
+    }
+  }
+
+  // Signal intensity arc
+  cctx.beginPath();
+  cctx.arc(cCX,cCY,cR-4,-Math.PI/2,(motorAngle-90)*Math.PI/180,false);
+  cctx.strokeStyle='rgba(0,255,157,0.3)';
+  cctx.lineWidth=6;
+  cctx.stroke();
+
+  // Needle
+  const na=(motorAngle-90)*Math.PI/180;
+  cctx.beginPath();
+  cctx.moveTo(cCX,cCY);
+  cctx.lineTo(cCX+Math.cos(na)*(cR-18),cCY+Math.sin(na)*(cR-18));
+  cctx.strokeStyle='#00ff9d';
+  cctx.lineWidth=2.5;
+  cctx.shadowColor='#00ff9d';
+  cctx.shadowBlur=10;
+  cctx.stroke();
+  cctx.shadowBlur=0;
+
+  // Needle tip glow dot
+  cctx.beginPath();
+  cctx.arc(cCX+Math.cos(na)*(cR-18),cCY+Math.sin(na)*(cR-18),4,0,TWO_PI);
+  cctx.fillStyle='#00ff9d';
+  cctx.shadowColor='#00ff9d';
+  cctx.shadowBlur=14;
+  cctx.fill();
+  cctx.shadowBlur=0;
+
+  // Center
+  cctx.beginPath();
+  cctx.arc(cCX,cCY,7,0,TWO_PI);
+  cctx.fillStyle='#00d4ff';
+  cctx.shadowColor='#00d4ff';
+  cctx.shadowBlur=14;
+  cctx.fill();
+  cctx.shadowBlur=0;
+
+  requestAnimationFrame(drawCompass);
+}
+drawCompass();
+
+// ===== GAUGE =====
+const gauge=document.getElementById('gaugeCanvas');
+const gctx=gauge.getContext('2d');
+let gaugeValue=0.45;let gaugeTarget=0.45;
+setInterval(()=>{ gaugeTarget=R(0.1,0.95); },2000);
+
+function drawGauge(){
+  gaugeValue=lerp(gaugeValue,gaugeTarget,0.03);
+  const W=gauge.width,H=gauge.height;
+  const cx=W/2,cy=H-20,r=H-30;
+  gctx.clearRect(0,0,W,H);
+
+  // Track
+  gctx.beginPath();
+  gctx.arc(cx,cy,r,Math.PI,0,false);
+  gctx.strokeStyle='rgba(0,212,255,0.1)';
+  gctx.lineWidth=14;
+  gctx.lineCap='round';
+  gctx.stroke();
+
+  // Color segments
+  const segs=[
+    {from:0,to:0.5,color:'#00ff9d'},
+    {from:0.5,to:0.75,color:'#ffb800'},
+    {from:0.75,to:1,color:'#ff4d6d'},
+  ];
+  segs.forEach(s=>{
+    gctx.beginPath();
+    gctx.arc(cx,cy,r,Math.PI*(1+s.from),Math.PI*(1+s.to),false);
+    gctx.strokeStyle=s.color+'55';
+    gctx.lineWidth=14;
+    gctx.stroke();
+  });
+
+  // Value arc
+  const col=gaugeValue<0.5?'#00ff9d':gaugeValue<0.75?'#ffb800':'#ff4d6d';
+  gctx.beginPath();
+  gctx.arc(cx,cy,r,Math.PI,Math.PI*(1+gaugeValue),false);
+  gctx.strokeStyle=col;
+  gctx.lineWidth=14;
+  gctx.shadowColor=col;
+  gctx.shadowBlur=12;
+  gctx.stroke();
+  gctx.shadowBlur=0;
+
+  // Needle
+  const na=Math.PI*(1+gaugeValue);
+  const nx=cx+Math.cos(na)*r;
+  const ny=cy+Math.sin(na)*r;
+  gctx.beginPath();
+  gctx.moveTo(cx,cy);
+  gctx.lineTo(nx,ny);
+  gctx.strokeStyle='#fff';
+  gctx.lineWidth=2;
+  gctx.shadowColor='#fff';
+  gctx.shadowBlur=8;
+  gctx.stroke();
+  gctx.shadowBlur=0;
+
+  // Center
+  gctx.beginPath();
+  gctx.arc(cx,cy,6,0,TWO_PI);
+  gctx.fillStyle='#fff';
+  gctx.fill();
+
+  // Value text
+  const pct=Math.round(gaugeValue*100);
+  const label=gaugeValue<0.5?'SAFE':gaugeValue<0.75?'CAUTION':'HIGH';
+  gctx.fillStyle=col;
+  gctx.font='bold 22px Orbitron';
+  gctx.textAlign='center';gctx.textBaseline='bottom';
+  gctx.shadowColor=col;gctx.shadowBlur=10;
+  gctx.fillText(pct+'%',cx,cy-8);
+  gctx.shadowBlur=0;
+  gctx.fillStyle='rgba(255,255,255,0.5)';
+  gctx.font='10px Rajdhani';
+  gctx.fillText(label,cx,cy+4);
+
+  requestAnimationFrame(drawGauge);
+}
+drawGauge();
+
+// ===== FIELD REGION PLOT =====
+const fieldC=document.getElementById('fieldCanvas');
+const fctx=fieldC.getContext('2d');
+let fieldNoise=[];
+for(let i=0;i<80;i++) fieldNoise.push(R(-1,1));
+
+function drawField(){
+  const W=fieldC.offsetWidth||500;
+  fieldC.width=W;
+  const H=fieldC.height=160;
+  fctx.clearRect(0,0,W,H);
+
+  // Background zones
+  const zones=[
+    {from:0,to:0.18,color:'rgba(255,77,109,0.12)',label:'Reactive NF'},
+    {from:0.18,to:0.42,color:'rgba(255,184,0,0.1)',label:'Radiating NF'},
+    {from:0.42,to:1,color:'rgba(0,212,255,0.07)',label:'Far Field'},
+  ];
+  zones.forEach(z=>{
+    fctx.fillStyle=z.color;
+    fctx.fillRect(z.from*W,0,(z.to-z.from)*W,H);
+    fctx.fillStyle='rgba(255,255,255,0.25)';
+    fctx.font='9px Share Tech Mono';
+    fctx.fillText(z.label,z.from*W+6,12);
+    // Zone divider
+    fctx.beginPath();
+    fctx.setLineDash([4,4]);
+    fctx.moveTo(z.to*W,0);fctx.lineTo(z.to*W,H);
+    fctx.strokeStyle='rgba(0,212,255,0.2)';
+    fctx.lineWidth=1;
+    fctx.stroke();
+    fctx.setLineDash([]);
+  });
+
+  // 1/r^2 decay curve
+  fctx.beginPath();
+  for(let x=0;x<W;x++){
+    const t=(x/W)*0.99+0.01;
+    const noise=fieldNoise[Math.floor(x/W*fieldNoise.length)]||0;
+    const y=H-30-(H-50)*(1-(1/(t*8+0.5)))+noise*4;
+    x===0?fctx.moveTo(x,Math.max(20,Math.min(H-10,y))):
+           fctx.lineTo(x,Math.max(20,Math.min(H-10,y)));
+  }
+  fctx.strokeStyle='#00d4ff';
+  fctx.lineWidth=2;
+  fctx.shadowColor='#00d4ff';
+  fctx.shadowBlur=8;
+  fctx.stroke();
+  fctx.shadowBlur=0;
+
+  // Fill
+  fctx.lineTo(W,H);fctx.lineTo(0,H);fctx.closePath();
+  const fg=fctx.createLinearGradient(0,0,0,H);
+  fg.addColorStop(0,'rgba(0,212,255,0.18)');
+  fg.addColorStop(1,'rgba(0,212,255,0.01)');
+  fctx.fillStyle=fg;
+  fctx.fill();
+
+  // Axes
+  fctx.fillStyle='rgba(0,212,255,0.5)';
+  fctx.font='9px Share Tech Mono';
+  fctx.textAlign='left';
+  fctx.fillText('E-Field',4,H-4);
+  fctx.textAlign='right';
+  fctx.fillText('Distance →',W-4,H-4);
+
+  // Moving current position marker
+  const pos=(Date.now()%8000)/8000;
+  const px=pos*W;
+  const pt=(pos)*0.99+0.01;
+  const pn=fieldNoise[Math.floor(pos*fieldNoise.length)]||0;
+  const py=H-30-(H-50)*(1-(1/(pt*8+0.5)))+pn*4;
+  fctx.beginPath();
+  fctx.arc(px,Math.max(20,Math.min(H-10,py)),5,0,TWO_PI);
+  fctx.fillStyle='#ff4d6d';
+  fctx.shadowColor='#ff4d6d';
+  fctx.shadowBlur=14;
+  fctx.fill();
+  fctx.shadowBlur=0;
+}
+setInterval(()=>{for(let i=0;i<fieldNoise.length;i++) fieldNoise[i]=lerp(fieldNoise[i],R(-1,1),0.1);},200);
+setInterval(drawField,30);
+
+// ===== LIVE STATS =====
+function updateStats(){
+  const field=(R(1.8,3.2)).toFixed(2);
+  const power=(R(10,22)).toFixed(1);
+  const vswr=(R(1.5,2.2)).toFixed(2);
+  const dir=Math.floor(R(0,360));
+
+  document.getElementById('sv-field').textContent=field;
+  document.getElementById('sv-power').textContent=power;
+  document.getElementById('sv-dir').textContent=dir+'°';
+  document.getElementById('sv-vswr').textContent=vswr;
+}
+setInterval(updateStats,2000);
+
+// ===== EVENT LOG =====
+const events=[
+  'Peak detected SW','Signal spike','Scan complete','New max field','VSWR nominal',
+  'Motor at 90°','Cloud sync OK','Threshold check','Pattern shift','Calibration done'
+];
+const freqTags=['880 MHz','940 MHz','1.84 GHz','2.14 GHz','2.35 GHz','2.4 GHz','5.1 GHz'];
+const statClasses=['tag-ok','tag-warn','tag-high'];
+const statLabels=['SAFE','CAUTION','HIGH'];
+
+function addLogRow(){
+  const tbody=document.getElementById('logBody');
+  const now=new Date();
+  const t=now.toTimeString().slice(0,8);
+  const ev=events[Math.floor(R(0,events.length))];
+  const fr=freqTags[Math.floor(R(0,freqTags.length))];
+  const si=Math.floor(R(0,3));
+  const row=document.createElement('tr');
+  row.className='log-row';
+  row.innerHTML=`<td>${t}</td><td style="color:#aad">${ev}</td><td style="color:var(--accent)">${fr}</td><td><span class="tag ${statClasses[si]}">${statLabels[si]}</span></td>`;
+  tbody.insertBefore(row,tbody.firstChild);
+  while(tbody.children.length>12) tbody.removeChild(tbody.lastChild);
+}
+setInterval(addLogRow,1800);
+addLogRow();
+
+</script>
+</body>
+</html>
